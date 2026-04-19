@@ -64,64 +64,200 @@ function goScreen(name, btn) {
   if (name === 'settings') renderFoldersSettings();
 }
 
-// ── Gestión de carpetas ───────────────────────────
+// ── Gestión de carpetas guardadas ─────────────────
+var _selectedFolder = null; // { id, name, driveId }
+
 async function loadFolders() {
-  const folders = await dbGetFolders();
-  const sel     = document.getElementById('folder-select');
-  // Mantener selección actual
-  const prev    = sel.value;
-  sel.innerHTML = '<option value="">-- Elegí una carpeta --</option>';
-  folders.sort((a,b) => a.name.localeCompare(b.name, 'es'))
-         .forEach(f => {
-    const opt = document.createElement('option');
-    opt.value       = f.id;
-    opt.textContent = f.name;
-    sel.appendChild(opt);
-  });
-  if (prev) sel.value = prev;
+  // Restaurar carpeta seleccionada previamente
+  const saved = await dbGetSetting('last_folder');
+  if (saved) {
+    _selectedFolder = saved;
+    updateFolderDisplay();
+  }
 }
 
-async function addFolder() {
-  const inp  = document.getElementById('folder-name-inp');
-  const name = inp.value.trim();
-  if (!name) { toast('Ingresá un nombre de carpeta', 'error'); return; }
-
-  const folder = {
-    id:      'folder_' + Date.now(),
-    name,
-    driveId: null, // se resuelve al subir
-  };
-  await dbSaveFolder(folder);
-  inp.value = '';
-  await loadFolders();
-  // Seleccionar la carpeta recién creada
-  document.getElementById('folder-select').value = folder.id;
-  toast('Carpeta "' + name + '" agregada');
-  renderFoldersSettings();
+function updateFolderDisplay() {
+  const nameEl = document.getElementById('folder-display-name');
+  const icoEl  = document.getElementById('folder-display-ico');
+  if (_selectedFolder) {
+    nameEl.textContent = _selectedFolder.name;
+    nameEl.classList.remove('placeholder');
+    icoEl.textContent  = '📂';
+  } else {
+    nameEl.textContent = 'Tocá para elegir carpeta...';
+    nameEl.classList.add('placeholder');
+    icoEl.textContent  = '📁';
+  }
 }
 
 async function deleteFolder(id) {
   await dbDeleteFolder(id);
-  await loadFolders();
+  if (_selectedFolder && _selectedFolder.id === id) {
+    _selectedFolder = null;
+    updateFolderDisplay();
+  }
   renderFoldersSettings();
-  toast('Carpeta eliminada');
+  toast('Carpeta eliminada de favoritos');
 }
 
 async function renderFoldersSettings() {
   const folders = await dbGetFolders();
   const cont    = document.getElementById('folders-settings-list');
   if (!folders.length) {
-    cont.innerHTML = '<div style="color:var(--muted);font-size:.8rem;padding:8px 0;">Sin carpetas configuradas.</div>';
+    cont.innerHTML = '<div style="color:var(--muted);font-size:.8rem;padding:8px 0;">Sin carpetas favoritas guardadas.</div>';
     return;
   }
   cont.innerHTML = folders.map(f => `
-    <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);">
-      <span style="font-size:1rem;">📁</span>
-      <span style="flex:1;font-size:.88rem;">${f.name}</span>
-      ${f.driveId ? '<span style="font-size:.65rem;color:#6dc86d;">✓ En Drive</span>' : '<span style="font-size:.65rem;color:var(--muted);">Local</span>'}
-      <button class="item-btn del" onclick="deleteFolder('${f.id}')">🗑</button>
+    <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);">
+      <span style="font-size:1rem;">📂</span>
+      <div style="flex:1;">
+        <div style="font-size:.88rem;">${f.name}</div>
+        <div style="font-size:.68rem;color:var(--muted);">${f.path || ''}</div>
+      </div>
+      <button class="item-btn" onclick="selectSavedFolder('${f.id}')" title="Usar esta">✓</button>
+      <button class="item-btn del" onclick="deleteFolder('${f.id}')" title="Eliminar">🗑</button>
     </div>
   `).join('');
+}
+
+async function selectSavedFolder(id) {
+  const folders = await dbGetFolders();
+  const f = folders.find(x => x.id === id);
+  if (!f) return;
+  _selectedFolder = f;
+  await dbSetSetting('last_folder', f);
+  updateFolderDisplay();
+  toast('Carpeta: ' + f.name);
+}
+
+// ══════════════════════════════════════════════════
+// SELECTOR DE CARPETAS DE DRIVE (panel desplegable)
+// ══════════════════════════════════════════════════
+var _fpStack    = []; // historial de navegación [{id, name}]
+var _fpCurId    = null;
+var _fpCurName  = 'Mi Drive';
+
+async function openFolderPicker() {
+  if (!driveIsConnected()) {
+    toast('Conectá Drive primero en Ajustes', 'error');
+    return;
+  }
+  _fpStack   = [];
+  _fpCurId   = null;
+  _fpCurName = 'Mi Drive';
+  document.getElementById('folder-picker-panel').classList.add('on');
+  document.getElementById('fp-select-here-btn').style.display = 'none';
+  await fpLoadList();
+}
+
+function closeFolderPicker() {
+  document.getElementById('folder-picker-panel').classList.remove('on');
+}
+
+async function fpNavRoot() {
+  _fpStack   = [];
+  _fpCurId   = null;
+  _fpCurName = 'Mi Drive';
+  document.getElementById('fp-select-here-btn').style.display = 'none';
+  await fpLoadList();
+}
+
+async function fpNavInto(id, name) {
+  _fpStack.push({ id: _fpCurId, name: _fpCurName });
+  _fpCurId   = id;
+  _fpCurName = name;
+  document.getElementById('fp-select-here-btn').style.display = 'flex';
+  await fpLoadList();
+}
+
+async function fpNavBack() {
+  if (!_fpStack.length) return;
+  const prev = _fpStack.pop();
+  _fpCurId   = prev.id;
+  _fpCurName = prev.name;
+  document.getElementById('fp-select-here-btn').style.display =
+    _fpStack.length > 0 ? 'flex' : 'none';
+  await fpLoadList();
+}
+
+async function fpLoadList() {
+  // Actualizar breadcrumb
+  const bc = document.getElementById('folder-picker-breadcrumb');
+  let bcHtml = '<span class="breadcrumb-item" onclick="fpNavRoot()">Mi Drive</span>';
+  _fpStack.forEach((item, i) => {
+    bcHtml += '<span class="breadcrumb-sep">›</span>';
+    bcHtml += `<span class="breadcrumb-item" onclick="fpNavToIdx(${i})">${item.name}</span>`;
+  });
+  if (_fpCurId) {
+    bcHtml += '<span class="breadcrumb-sep">›</span>';
+    bcHtml += `<span style="color:var(--text);">${_fpCurName}</span>`;
+  }
+  bc.innerHTML = bcHtml;
+
+  // Actualizar título
+  document.getElementById('folder-picker-title').textContent = '📁 ' + _fpCurName;
+
+  // Mostrar cargando
+  const list = document.getElementById('folder-picker-list');
+  list.innerHTML = '<div id="folder-picker-loading">⟳ Cargando...</div>';
+
+  // Cargar carpetas favoritas guardadas
+  const savedFolders = await dbGetFolders();
+
+  // Cargar carpetas de Drive
+  const driveFolders = await driveListFolders(_fpCurId);
+
+  if (!driveFolders.length) {
+    list.innerHTML = '<div id="folder-picker-loading" style="color:var(--muted);">Sin subcarpetas aquí.<br><small>Podés usar esta carpeta directamente.</small></div>';
+    return;
+  }
+
+  list.innerHTML = driveFolders.map(f => {
+    const isSaved = savedFolders.some(s => s.driveId === f.id);
+    return `<div class="fp-item${isSaved?' saved':''}" onclick="fpNavInto('${f.id}','${f.name.replace(/'/g,"\'")}')">
+      <span class="fp-item-ico">📁</span>
+      <span class="fp-item-name">${f.name}</span>
+      ${isSaved ? '<span class="fp-item-saved-badge">★ Guardada</span>' : ''}
+      <span class="fp-item-arrow">›</span>
+    </div>`;
+  }).join('');
+}
+
+async function fpNavToIdx(idx) {
+  // Navegar a un punto del historial
+  const target = _fpStack[idx];
+  _fpStack = _fpStack.slice(0, idx);
+  _fpCurId   = target.id;
+  _fpCurName = target.name;
+  document.getElementById('fp-select-here-btn').style.display =
+    _fpCurId ? 'flex' : 'none';
+  await fpLoadList();
+}
+
+async function fpSelectCurrent() {
+  // Seleccionar la carpeta actual como destino
+  const folder = {
+    id:      'folder_' + Date.now(),
+    name:    _fpCurName,
+    driveId: _fpCurId,
+    path:    [..._fpStack.map(s => s.name), _fpCurName].join(' / '),
+  };
+
+  // Guardar en favoritos si no está ya
+  const existing = await dbGetFolders();
+  const alreadySaved = existing.find(f => f.driveId === _fpCurId);
+  if (!alreadySaved) {
+    await dbSaveFolder(folder);
+  } else {
+    folder.id = alreadySaved.id;
+  }
+
+  _selectedFolder = folder;
+  await dbSetSetting('last_folder', folder);
+  updateFolderDisplay();
+  closeFolderPicker();
+  renderFoldersSettings();
+  toast('✓ Carpeta: ' + folder.name, 'success');
 }
 
 // ── Nombre automático ─────────────────────────────
@@ -139,9 +275,7 @@ function setAutoFilename() {
 async function saveRecording() {
   if (!_currentBlob) { toast('No hay grabación para guardar', 'error'); return; }
 
-  const folderId  = document.getElementById('folder-select').value;
-  const folders   = await dbGetFolders();
-  const folder    = folders.find(f => f.id === folderId);
+  const folder = _selectedFolder;
   const baseFilename = document.getElementById('rec-filename').value.trim() ||
     'sesion_' + new Date().toISOString().slice(0,16).replace(/[T:]/g,'-');
   const ext      = getFileExtension(_currentBlob.type);
@@ -150,7 +284,7 @@ async function saveRecording() {
   const rec = {
     id:         'rec_' + Date.now(),
     filename,
-    folderId:   folder?.id || null,
+    folderId:   folder?.driveId || null,
     folderName: folder?.name || 'Sin carpeta',
     status:     'pending',
     createdAt:  Date.now(),
