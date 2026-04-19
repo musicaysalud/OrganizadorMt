@@ -9,6 +9,7 @@
 // Agregar como origen autorizado: la URL donde hospedarás la app
 // Copiar el Client ID aquí:
 const GOOGLE_CLIENT_ID = '186859015994-op7ksv4b7441n732rjmdk6mb974kco4o.apps.googleusercontent.com';
+
 const DRIVE_SCOPE    = 'https://www.googleapis.com/auth/drive.file';
 const TOKEN_KEY      = 'mc_drive_token';
 const USER_KEY       = 'mc_drive_user';
@@ -239,4 +240,22 @@ async function driveSyncPending() {
     }
   }
   renderRecordingsList();
+}
+
+// ── Listar carpetas del Drive del usuario ─────────
+async function driveListFolders(parentId) {
+  if (!driveIsConnected()) return [];
+  const q = parentId
+    ? `mimeType='application/vnd.google-apps.folder' and '${parentId}' in parents and trashed=false`
+    : `mimeType='application/vnd.google-apps.folder' and trashed=false`;
+  try {
+    const res  = await fetch(
+      `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name)&orderBy=name&pageSize=100`,
+      { headers: { Authorization: 'Bearer ' + _driveToken } }
+    );
+    const data = await res.json();
+    return (data.files || []).sort((a,b) => a.name.localeCompare(b.name,'es'));
+  } catch(e) {
+    return [];
+  }
 }
