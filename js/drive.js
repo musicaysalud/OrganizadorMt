@@ -9,7 +9,6 @@
 // Agregar como origen autorizado: la URL donde hospedarás la app
 // Copiar el Client ID aquí:
 const GOOGLE_CLIENT_ID = '186859015994-op7ksv4b7441n732rjmdk6mb974kco4o.apps.googleusercontent.com';
-
 const DRIVE_SCOPE    = 'https://www.googleapis.com/auth/drive.file';
 const TOKEN_KEY      = 'mc_drive_token';
 const USER_KEY       = 'mc_drive_user';
