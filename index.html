@@ -103,6 +103,67 @@ html, body {
 .nav-btn .ico { font-size: 1.3rem; }
 .nav-btn.active { color: var(--accent); }
 
+/* Selector de carpetas Drive */
+#folder-picker-panel{
+  position:fixed;inset:0;z-index:500;background:rgba(0,0,0,.7);
+  display:none;align-items:flex-end;justify-content:center;
+}
+#folder-picker-panel.on{display:flex;}
+#folder-picker-box{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--r) var(--r) 0 0;width:100%;max-height:75vh;
+  display:flex;flex-direction:column;padding-bottom:var(--safe-bottom);
+}
+#folder-picker-header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:16px 18px 12px;border-bottom:1px solid var(--border);flex-shrink:0;
+}
+#folder-picker-title{font-size:.95rem;font-weight:600;color:var(--accent);}
+#folder-picker-close{background:none;border:none;color:var(--muted);font-size:1.2rem;cursor:pointer;padding:4px 8px;}
+#folder-picker-breadcrumb{
+  padding:10px 18px;font-size:.75rem;color:var(--muted);
+  border-bottom:1px solid var(--border);flex-shrink:0;
+  display:flex;align-items:center;gap:6px;flex-wrap:wrap;
+}
+.breadcrumb-item{cursor:pointer;color:var(--accent);transition:opacity .15s;}
+.breadcrumb-item:hover{opacity:.7;}
+.breadcrumb-sep{color:var(--border);}
+#folder-picker-list{overflow-y:auto;flex:1;}
+.fp-item{
+  display:flex;align-items:center;gap:12px;
+  padding:14px 18px;border-bottom:1px solid var(--border);
+  cursor:pointer;transition:background .12s;
+}
+.fp-item:active{background:var(--surface2);}
+.fp-item-ico{font-size:1.2rem;flex-shrink:0;}
+.fp-item-name{flex:1;font-size:.9rem;}
+.fp-item-arrow{color:var(--muted);font-size:.9rem;}
+.fp-item.saved{background:rgba(200,169,110,.06);}
+.fp-item-saved-badge{
+  font-size:.6rem;color:var(--accent);
+  border:1px solid rgba(200,169,110,.4);
+  border-radius:10px;padding:2px 7px;flex-shrink:0;
+}
+#folder-picker-loading{
+  text-align:center;padding:40px;color:var(--muted);font-size:.85rem;
+}
+#folder-picker-actions{
+  padding:12px 18px;border-top:1px solid var(--border);
+  display:flex;gap:8px;flex-shrink:0;
+}
+/* Selector visible en pantalla grabar */
+#folder-display{
+  display:flex;align-items:center;gap:10px;
+  background:var(--surface3);border:1px solid var(--border);
+  border-radius:var(--rs);padding:11px 14px;cursor:pointer;
+  transition:border-color .15s;
+}
+#folder-display:active{border-color:var(--accent);}
+#folder-display-ico{font-size:1.1rem;flex-shrink:0;}
+#folder-display-name{flex:1;font-size:.88rem;color:var(--text);}
+#folder-display-name.placeholder{color:var(--muted);}
+#folder-display-arrow{color:var(--muted);font-size:.8rem;}
+
 /* ═══════════════════════════════════════════════════
    PANTALLA: GRABAR
 ═══════════════════════════════════════════════════ */
@@ -449,12 +510,10 @@ html, body {
     <!-- Selector de carpeta -->
     <div class="folder-selector">
       <label>📁 Carpeta de destino en Drive</label>
-      <select id="folder-select">
-        <option value="">-- Elegí una carpeta --</option>
-      </select>
-      <div class="add-folder-row">
-        <input type="text" id="folder-name-inp" placeholder="Nombre de nueva carpeta..." spellcheck="false">
-        <button class="btn-sm" onclick="addFolder()">+ Agregar</button>
+      <div id="folder-display" onclick="openFolderPicker()">
+        <span id="folder-display-ico">📁</span>
+        <span id="folder-display-name" class="placeholder">Tocá para elegir carpeta...</span>
+        <span id="folder-display-arrow">▾</span>
       </div>
     </div>
 
@@ -584,6 +643,28 @@ html, body {
 </div>
 
 <!-- TOAST -->
+<!-- Panel selector de carpetas Drive -->
+<div id="folder-picker-panel">
+  <div id="folder-picker-box">
+    <div id="folder-picker-header">
+      <span id="folder-picker-title">📁 Elegir carpeta</span>
+      <button id="folder-picker-close" onclick="closeFolderPicker()">✕</button>
+    </div>
+    <div id="folder-picker-breadcrumb">
+      <span class="breadcrumb-item" onclick="fpNavRoot()">Mi Drive</span>
+    </div>
+    <div id="folder-picker-list">
+      <div id="folder-picker-loading">Cargando carpetas...</div>
+    </div>
+    <div id="folder-picker-actions">
+      <button class="btn-accent" id="fp-select-here-btn" onclick="fpSelectCurrent()" style="display:none">
+        ✓ Usar esta carpeta
+      </button>
+      <button class="btn-outline" onclick="closeFolderPicker()">Cancelar</button>
+    </div>
+  </div>
+</div>
+
 <div id="toast"></div>
 
 <!-- MODAL -->
