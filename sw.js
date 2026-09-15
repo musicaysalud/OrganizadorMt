@@ -1,5 +1,5 @@
 // sw.js — Service Worker para modo offline
-const CACHE = 'musicare-mobile-v6';
+const CACHE = 'musicare-mobile-v7';
 const ASSETS = [
   './',
   './index.html',
