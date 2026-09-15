@@ -269,11 +269,11 @@ function cronRenderCal(pat) {
 
   // Grid
   html += `<div style="display:grid;grid-template-columns:repeat(${nCols},1fr);gap:1px;
-    background:var(--border);padding:1px;">`;
+    background:var(--border);border:1px solid var(--border);">`;
 
   // Celdas vacías iniciales
   for (let i = 0; i < leadingEmpties; i++) {
-    html += `<div style="background:var(--surface);min-height:64px;opacity:.35;"></div>`;
+    html += `<div style="background:var(--bg);min-height:64px;"></div>`;
   }
 
   // Solo días del mes que caen en un día activo
@@ -316,7 +316,7 @@ function cronRenderCal(pat) {
   const rem = cellCount % nCols;
   if (rem > 0) {
     for (let i = rem; i < nCols; i++) {
-      html += `<div style="background:var(--surface);min-height:64px;opacity:.35;"></div>`;
+      html += `<div style="background:var(--bg);min-height:64px;"></div>`;
     }
   }
 
